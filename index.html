@@ -306,6 +306,35 @@
     const f = e.target.files[0]; if(!f) return;
     readFileJSON(f).then(pl => { if(pl && Array.isArray(pl.items)) { gallery = pl.items; savePlatform(gallery); renderGallery(); } else { alert('Invalid platform file'); } });
   }
+
+  platformFile.onchange = e => {
+  const f = e.target.files[0];
+  if (!f) return;
+
+  platformFile.onchange = e => {
+  const f = e.target.files[0];
+  if (!f) return;
+
+  readFileJSON(f).then(data => {
+    // Platform file: { type: "platform", items: [...] }
+    if (data && data.type === "platform" && Array.isArray(data.items)) {
+      gallery = data.items;
+      savePlatform(gallery);
+      renderGallery();
+      flash("Platform imported ✔");
+    }
+    // Single OS file: { id, name, wallpaper, ... }
+    else if (data && data.name && data.apps) {
+      addOrReplaceOS(data);
+      flash("OS imported ✔");
+    }
+    else {
+      alert("Invalid file format. Expected .platform.json or .os.json");
+    }
+  });
+};
+    readFileJSON(f).then(os => { addOrReplaceOS(os); drawer.classList.remove('open'); });
+    };
   addCustomAppBtn.onclick = () => {
     const name = customAppName.value.trim();
     const html = customAppHtml.value.trim();
