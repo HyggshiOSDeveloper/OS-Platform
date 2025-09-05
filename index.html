@@ -163,12 +163,12 @@
   const $$ = (sel, root=document) => [...root.querySelectorAll(sel)];
   const uid = () => Math.random().toString(36).slice(2,9);
 
-  const DEFAULT_APPS = [
+    const DEFAULT_APPS = [
     {
       id: 'notes', title: 'Notes', icon: '📝',
       html: `<div style="padding:10px;display:grid;gap:8px">
         <textarea style="width:100%;height:220px;background:#0a1120;color:#dfe7fb;
-        border:1px solid #2a3557;border-radius:8px" placeholder="Type your notes here..."></textarea></div>`
+        border:1px solid #2a3557;border-radius:8px"></textarea></div>`
     },
     {
       id: 'paint', title: 'Paint', icon: '🎨',
@@ -238,7 +238,7 @@
       id: 'settings', title: 'Settings', icon: '⚙️',
       html: `<div style="padding:10px;display:grid;gap:8px">
         <label>Accent <input type="color" id="setAccent"/></label>
-        <label>Wallpaper URL <input id="setWall" placeholder="Enter image URL"/></label>
+        <label>Wallpaper URL <input id="setWall"/></label>
         <button onclick="(function(){
           const a=document.getElementById('setAccent').value;
           const w=document.getElementById('setWall').value;
@@ -246,6 +246,7 @@
         })()" class="btn">Apply</button></div>`
     }
   ];
+
 
   // --- State ---
   let gallery = loadPlatform(); // array of OS objects
@@ -280,9 +281,7 @@
 
   // --- Init ---
   renderGallery();
-  if (gallery.length > 0) {
-    setPreview(gallery[0]);
-  }
+  setPreview(gallery[0]);
 
   // --- Event wiring ---
   newBtn.onclick = () => openBuilder();
@@ -290,14 +289,7 @@
   helpBtn.onclick = () => alert(`How it works:\n\n• Create OS: open the builder, set name, wallpaper, accent, choose apps.\n• Save OS: stores to the Platform Gallery (local).\n• Export: download a .os.json to share; Import to add someone else's OS.\n• Click a card to preview and use the OS. Windows are draggable + resizable.\n• Save Platform: saves entire gallery to localStorage. Export to .platform.json to back up.\n\nTip: Add a Custom App by pasting HTML (widgets, iframes, etc.).`);
   saveGalleryBtn.onclick = () => { savePlatform(gallery); flash('Platform saved to this browser.'); };
   exportPlatformBtn.onclick = () => downloadJSON({ type:'platform', items: gallery }, `platform-${Date.now()}.platform.json`);
-  resetBtn.onclick = () => { 
-    if(confirm('Reset platform and clear localStorage?')){ 
-      gallery = []; 
-      savePlatform(gallery); 
-      renderGallery(); 
-      clearDesktop(); 
-    }
-  };
+  resetBtn.onclick = () => { if(confirm('Reset platform and clear localStorage?')){ gallery = []; savePlatform(gallery); renderGallery(); clearDesktop(); }}
 
   closeDrawer.onclick = () => drawer.classList.remove('open');
   saveOsBtn.onclick = persistOS;
@@ -306,85 +298,63 @@
     if(!os.name) return alert('Name your OS first.');
     downloadJSON(os, `${slug(os.name)}.os.json`);
   }
-  
   importOsFile.onchange = e => {
-    const f = e.target.files[0]; 
-    if(!f) return;
-    readFileJSON(f).then(os => { 
-      addOrReplaceOS(os); 
-      drawer.classList.remove('open'); 
-      flash('OS imported ✓');
-    }).catch(err => {
-      alert('Error importing OS file: ' + err.message);
-    });
+    const f = e.target.files[0]; if(!f) return;
+    readFileJSON(f).then(os => { addOrReplaceOS(os); drawer.classList.remove('open'); });
+  }
+  platformFile.onchange = e => {
+    const f = e.target.files[0]; if(!f) return;
+    readFileJSON(f).then(pl => { if(pl && Array.isArray(pl.items)) { gallery = pl.items; savePlatform(gallery); renderGallery(); } else { alert('Invalid platform file'); } });
   }
 
-  // Fixed platform file import
   platformFile.onchange = e => {
-    const f = e.target.files[0];
-    if (!f) return;
+  const f = e.target.files[0];
+  if (!f) return;
 
-    readFileJSON(f).then(data => {
-      // Platform file: { type: "platform", items: [...] }
-      if (data && data.type === "platform" && Array.isArray(data.items)) {
-        gallery = data.items;
-        savePlatform(gallery);
-        renderGallery();
-        flash("Platform imported ✓");
-      }
-      // Single OS file: { id, name, wallpaper, ... }
-      else if (data && data.name && (data.apps || data.wallpaper)) {
-        addOrReplaceOS(data);
-        flash("OS imported ✓");
-      }
-      else {
-        alert("Invalid file format. Expected .platform.json or .os.json");
-      }
-    }).catch(err => {
-      alert("Error reading file: " + err.message);
-    });
-  };
+  platformFile.onchange = e => {
+  const f = e.target.files[0];
+  if (!f) return;
 
+  readFileJSON(f).then(data => {
+    // Platform file: { type: "platform", items: [...] }
+    if (data && data.type === "platform" && Array.isArray(data.items)) {
+      gallery = data.items;
+      savePlatform(gallery);
+      renderGallery();
+      flash("Platform imported ✔");
+    }
+    // Single OS file: { id, name, wallpaper, ... }
+    else if (data && data.name && data.apps) {
+      addOrReplaceOS(data);
+      flash("OS imported ✔");
+    }
+    else {
+      alert("Invalid file format. Expected .platform.json or .os.json");
+    }
+  });
+};
+    readFileJSON(f).then(os => { addOrReplaceOS(os); drawer.classList.remove('open'); });
+    };
   addCustomAppBtn.onclick = () => {
     const name = customAppName.value.trim();
     const html = customAppHtml.value.trim();
     if(!name || !html) return alert('Enter name and HTML.');
     const chip = createChip({ id: uid(), title: name, icon: '🧩', html }, true);
     appsToggle.prepend(chip);
-    customAppName.value=''; 
-    customAppHtml.value='';
+    customAppName.value=''; customAppHtml.value='';
   }
 
   // --- Platform functions ---
   function loadPlatform(){
-    try{ 
-      const data = localStorage.getItem('osPlatform');
-      return data ? JSON.parse(data) : []; 
-    } catch(e){ 
-      console.error('Error loading platform:', e);
-      return []; 
-    }
+    try{ return JSON.parse(localStorage.getItem('osPlatform')||'[]'); }catch(e){ return []; }
   }
-  
-  function savePlatform(items){ 
-    try {
-      localStorage.setItem('osPlatform', JSON.stringify(items)); 
-    } catch(e) {
-      console.error('Error saving platform:', e);
-      alert('Failed to save platform to localStorage');
-    }
-  }
-  
+  function savePlatform(items){ localStorage.setItem('osPlatform', JSON.stringify(items)); }
   function renderGallery(){
     galleryEl.innerHTML = '';
     countLabel.textContent = `${gallery.length} OS${gallery.length!==1?'es':''}`;
-    if(!gallery.length){ 
-      galleryEl.innerHTML = `<div class="empty">No OS yet. Click <b>Create OS</b> to start, or <b>Import</b> an .os.json.</div>`; 
-      return; 
-    }
+    if(!gallery.length){ galleryEl.innerHTML = `<div class="empty">No OS yet. Click <b>Create OS</b> to start, or <b>Import</b> an .os.json.</div>`; return; }
     gallery.forEach(os => {
-      const card = document.createElement('div'); 
-      card.className='card';
+      const card = document.createElement('div'); card.className='card';
       card.innerHTML = `
         <div class="thumb" style="background-image:url('${os.wallpaper||''}')"></div>
         <div class="body">
@@ -399,77 +369,42 @@
       card.querySelector('[data-act="open"]').onclick = () => setPreview(os);
       card.querySelector('[data-act="edit"]').onclick = () => openBuilder(os.id);
       card.querySelector('[data-act="export"]').onclick = () => downloadJSON(os, `${slug(os.name)}.os.json`);
-      card.querySelector('[data-act="delete"]').onclick = () => { 
-        if(confirm('Delete this OS?')){ 
-          gallery = gallery.filter(x=>x.id!==os.id); 
-          savePlatform(gallery); 
-          renderGallery(); 
-          if(activeOS?.id===os.id) clearDesktop(); 
-        } 
-      };
+      card.querySelector('[data-act="delete"]').onclick = () => { if(confirm('Delete this OS?')){ gallery = gallery.filter(x=>x.id!==os.id); savePlatform(gallery); renderGallery(); if(activeOS?.id===os.id) clearDesktop(); } };
       galleryEl.appendChild(card);
     });
   }
-  
   function addOrReplaceOS(os){
     if(!os.id) os.id = uid();
     const i = gallery.findIndex(x=>x.id===os.id);
     if(i>=0) gallery[i]=os; else gallery.unshift(os);
-    savePlatform(gallery); 
-    renderGallery(); 
-    setPreview(os);
+    savePlatform(gallery); renderGallery(); setPreview(os);
   }
 
   // --- Builder ---
   function openBuilder(id){
-    editingId = id||null; 
-    drawer.classList.add('open');
+    editingId = id||null; drawer.classList.add('open');
     appsToggle.innerHTML = '';
     DEFAULT_APPS.forEach(app => appsToggle.appendChild(createChip(app)));
 
     if(id){
-      const os = gallery.find(x=>x.id===id); 
-      if(!os) return;
-      osName.value = os.name||''; 
-      osWallpaper.value = os.wallpaper||''; 
-      osAccent.value = os.accent||'#6aa6ff'; 
-      osDockPos.value = os.dockPos||'bottom';
+      const os = gallery.find(x=>x.id===id); if(!os) return;
+      osName.value = os.name||''; osWallpaper.value = os.wallpaper||''; osAccent.value = os.accent||'#6aa6ff'; osDockPos.value = os.dockPos||'bottom';
       // mark enabled apps
       (os.apps||[]).forEach(a=>{
         const chip = [...appsToggle.children].find(c=>c.dataset.id===a.id);
-        if(chip){ 
-          chip.classList.add('active'); 
-          chip.dataset.enabled='1'; 
-          chip.dataset.icon=a.icon||'🧩'; 
-          chip.dataset.title=a.title; 
-          chip.dataset.html=a.html;
-        }
+        if(chip){ chip.classList.add('active'); chip.dataset.enabled='1'; chip.dataset.icon=a.icon||'🧩'; chip.dataset.title=a.title; chip.dataset.html=a.html }
       })
     } else {
-      osName.value=''; 
-      osWallpaper.value=''; 
-      osAccent.value='#6aa6ff'; 
-      osDockPos.value='bottom';
+      osName.value=''; osWallpaper.value=''; osAccent.value='#6aa6ff'; osDockPos.value='bottom';
     }
   }
-  
   function persistOS(){
     const os = gatherFromForm();
-    if(!os.name.trim()) return alert('Please name your OS.');
-    addOrReplaceOS(os); 
-    drawer.classList.remove('open');
-    flash('OS saved ✓');
+    if(!os.name) return alert('Please name your OS.');
+    addOrReplaceOS(os); drawer.classList.remove('open');
   }
-  
   function gatherFromForm(){
-    const apps = [...appsToggle.children]
-      .filter(c=>c.dataset.enabled==='1')
-      .map(c=>({ 
-        id:c.dataset.id, 
-        title:c.dataset.title, 
-        icon:c.dataset.icon, 
-        html:c.dataset.html 
-      }));
+    const apps = [...appsToggle.children].filter(c=>c.dataset.enabled==='1').map(c=>({ id:c.dataset.id, title:c.dataset.title, icon:c.dataset.icon, html:c.dataset.html }));
     return {
       id: editingId || uid(),
       name: osName.value.trim(),
@@ -479,245 +414,129 @@
       apps
     }
   }
-  
   function createChip(app, active=false){
     const chip = document.createElement('div');
     chip.className = 'chip' + (active?' active':'');
     chip.textContent = `${app.icon||'🧩'} ${app.title}`;
-    chip.dataset.id=app.id; 
-    chip.dataset.title=app.title; 
-    chip.dataset.icon=app.icon||'🧩'; 
-    chip.dataset.html=app.html||'<div style="padding:10px">Empty app</div>';
+    chip.dataset.id=app.id; chip.dataset.title=app.title; chip.dataset.icon=app.icon||'🧩'; chip.dataset.html=app.html||'<div style="padding:10px">Empty app</div>';
     chip.dataset.enabled = active? '1':'0';
-    chip.onclick = () => { 
-      const en = chip.dataset.enabled==='1'; 
-      chip.dataset.enabled = en?'0':'1'; 
-      chip.classList.toggle('active'); 
-    };
+    chip.onclick = () => { const en = chip.dataset.enabled==='1'; chip.dataset.enabled = en?'0':'1'; chip.classList.toggle('active'); };
     return chip;
   }
 
   // --- Preview Desktop ---
   function setPreview(os){
-    activeOS = os||null; 
-    clearDesktop();
+    activeOS = os||null; clearDesktop();
     if(!os) return;
-    
     // wallpaper
-    if (os.wallpaper) {
-      desktop.style.backgroundImage = `url('${os.wallpaper}')`;
-    }
+    desktop.style.backgroundImage = os.wallpaper? `url('${os.wallpaper}')` : desktop.style.backgroundImage;
     desktop.style.setProperty('--accent', os.accent||'#6aa6ff');
     positionTaskbar(os.dockPos||'bottom');
-    
     // apps -> icons on taskbar & openable windows
     taskbar.innerHTML = '';
     (os.apps||[]).forEach((app,i)=>{
       const btn = document.createElement('button');
-      btn.className='task'; 
-      btn.textContent = `${app.icon||'🧩'} ${app.title}`;
+      btn.className='task'; btn.textContent = `${app.icon||'🧩'} ${app.title}`;
       btn.onclick = () => openWindow(app);
       taskbar.appendChild(btn);
-      if(i<2) setTimeout(() => openWindow(app), i * 100); // auto-open first 2 with slight delay
+      if(i<2) openWindow(app); // auto-open first 2
     })
-    
     // settings bridge
     window.__applySettings = ({accent, wallpaper})=>{
-      if(accent){ 
-        desktop.style.setProperty('--accent', accent); 
-        if(activeOS) activeOS.accent = accent; 
-      }
-      if(wallpaper){ 
-        desktop.style.backgroundImage = `url('${wallpaper}')`; 
-        if(activeOS) activeOS.wallpaper = wallpaper; 
-      }
+      if(accent){ desktop.style.setProperty('--accent', accent); activeOS.accent = accent; }
+      if(wallpaper){ desktop.style.backgroundImage = `url('${wallpaper}')`; activeOS.wallpaper = wallpaper; }
       // update card preview silently
-      if(activeOS) {
-        const i = gallery.findIndex(x=>x.id===activeOS.id); 
-        if(i>=0) { 
-          gallery[i]=activeOS; 
-          savePlatform(gallery); 
-          renderGallery(); 
-        }
-      }
+      const i = gallery.findIndex(x=>x.id===activeOS.id); if(i>=0) { gallery[i]=activeOS; savePlatform(gallery); renderGallery(); }
     }
   }
-  
   function positionTaskbar(pos){
-    const tb = taskbar; 
-    tb.style.inset='';
+    const tb = taskbar; tb.style.inset='';
     if(pos==='bottom'){ tb.style.inset = 'auto 0 0 0'; tb.style.flexDirection='row'; }
     if(pos==='top'){ tb.style.inset = '0 0 auto 0'; tb.style.flexDirection='row'; }
-    if(pos==='left'){ tb.style.inset = '0 auto 0 0'; tb.style.flexDirection='column'; tb.style.width='auto'; }
-    if(pos==='right'){ tb.style.inset = '0 0 0 auto'; tb.style.flexDirection='column'; tb.style.width='auto'; }
+    if(pos==='left'){ tb.style.inset = '0 auto 0 0'; tb.style.flexDirection='column'; }
+    if(pos==='right'){ tb.style.inset = '0 0 0 auto'; tb.style.flexDirection='column'; }
   }
-  
-  function clearDesktop(){ 
-    desktop.querySelectorAll('.window').forEach(w=>w.remove()); 
-    taskbar.innerHTML=''; 
-  }
+  function clearDesktop(){ desktop.querySelectorAll('.window').forEach(w=>w.remove()); taskbar.innerHTML=''; }
 
   function openWindow(app){
-    const win = document.createElement('div'); 
-    win.className='window'; 
-    win.style.left = Math.max(20, 60 + Math.random()*120) + 'px'; 
-    win.style.top = Math.max(20, 60 + Math.random()*80) + 'px';
+    const win = document.createElement('div'); win.className='window'; win.style.left = 60 + Math.random()*120 + 'px'; win.style.top = 60 + Math.random()*80 + 'px';
     win.innerHTML = `
       <div class="titlebar">
-        <span class="dot close" title="Close
-"></span>
+        <span class="dot close" title="Close"></span>
         <span class="dot min" title="Minimize"></span>
         <span class="dot max" title="Maximize"></span>
-        <strong style="margin-left:8px;user-select:none">${escapeHtml(app.title
-)}</strong>
+        <strong style="margin-left:6px">${escapeHtml(app.title)}</strong>
       </div>
-      <div class="content">${app.html||'<div style="padding:10px">Empty app</div>'}</div>
+      <div class="content">${app.html||''}</div>
       <div class="resizer"></div>`;
     desktop.appendChild(win);
-    makeDraggable(win);
-    makeResizable(win);
-    // Close button
-    win.querySelector('.dot.close').onclick = () => win.remove();
-    // Minimize button
-    win.querySelector('.dot.min').onclick = () => {
-      if(win.style.display==='none'){ win.style.display='flex'; }
-      else { win.style.display='none'; }
-    };
-    // Maximize button
-    win.querySelector('.dot.max').onclick = () => {
-      if(win.dataset.max==='1'){
-        // restore
-        win.style.width = win.dataset.w || '420px';
-        win.style.height = win.dataset.h || '300px';
-        win.style.left = win.dataset.x || '60px';
-        win.style.top = win.dataset.y || '60px';
-        win.dataset.max='0';
-      } else {
-        // maximize
-        win.dataset.w = win.style.width;
-        win.dataset.h = win.style.height;
-        win.dataset.x = win.style.left;
-        win.dataset.y = win.style.top;
-        win.style.width = (desktop.clientWidth - 20) + 'px';
-        win.style.height = (desktop.clientHeight - 20) + 'px';
-        win.style.left = '10px';
-        win.style.top = '10px';
-        win.dataset.max='1';
-      }
-    };
-    // Focus on click
-    win.onclick = () => {
-      [...desktop.children].forEach(c=>c.style.zIndex='0');
-      win.style.zIndex = '10';
-    };
-    win.click(); // focus
-    // Auto-focus first input/textarea inside
-    setTimeout(() => {
-      const inp = win.querySelector('input,textarea');
-      if(inp) inp.focus();
-    }, 300);
+    makeDraggable(win); makeResizable(win);
+    // controls
+    const [close,min,max] = $$('.titlebar .dot', win);
+    close.onclick = () => win.remove();
+    min.onclick = () => win.querySelector('.content').style.display = (win.querySelector('.content').style.display==='none'?'block':'none');
+    max.onclick = () => { if(win.dataset.max==='1'){ win.style.left='60px'; win.style.top='60px'; win.style.width='420px'; win.style.height=''; win.dataset.max='0'; } else { win.style.left='0'; win.style.top='0'; win.style.width='100%'; win.style.height='100%'; win.dataset.max='1'; }}
   }
+
+  // --- Window helpers ---
+  function makeDraggable(win){
+  const bar = $('.titlebar', win);
+  let offsetX = 0, offsetY = 0, dragging = false;
+
+  bar.addEventListener('mousedown', e => {
+    dragging = true;
+    bar.style.cursor = 'grabbing';
+    const rect = win.getBoundingClientRect();
+    // where inside the window did you click?
+    offsetX = e.clientX - rect.left;
+    offsetY = e.clientY - rect.top;
+    e.preventDefault();
+  });
+
+  window.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    win.style.left = (e.clientX - offsetX) + 'px';
+    win.style.top  = (e.clientY - offsetY) + 'px';
+  });
+
+  window.addEventListener('mouseup', () => {
+    dragging = false;
+    bar.style.cursor = 'grab';
+  });
+}
+    function makeResizable(win){
+        const resizer = $('.resizer', win);
+        let startX, startY, startWidth, startHeight, resizing = false;
+    
+        resizer.addEventListener('mousedown', e => {
+        resizing = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        const rect = win.getBoundingClientRect();
+        startWidth = rect.width;
+        startHeight = rect.height;
+        e.preventDefault();
+        });
+    
+        window.addEventListener('mousemove', e => {
+        if (!resizing) return;
+        const newWidth = startWidth + (e.clientX - startX);
+        const newHeight = startHeight + (e.clientY - startY);
+        win.style.width = Math.max(newWidth, 200) + 'px';
+        win.style.height = Math.max(newHeight, 100) + 'px';
+        });
+    
+        window.addEventListener('mouseup', () => {
+        resizing = false;
+        });
+    }
 
   // --- Utils ---
-  function makeDraggable(el){
-    const titlebar = el.querySelector('.titlebar');
-    if(!titlebar) return;
-    let isDragging = false, startX=0, startY=0, origX=0, origY=0;
-    titlebar.onmousedown = e => {
-      isDragging = true;
-      startX = e.clientX; startY = e.clientY;
-      const rect = el.getBoundingClientRect();
-      origX = rect.left; origY = rect.top;
-      titlebar.style.cursor = 'grabbing';
-      e.preventDefault();
-    };
-    document.onmouseup = () => {
-      isDragging = false;
-      titlebar.style.cursor = 'grab';
-    };
-    document.onmousemove = e => {
-      if(!isDragging) return;
-      const dx = e.clientX - startX;
-      const dy = e.clientY - startY;
-      el.style.left = Math.max(0, origX + dx) + 'px';
-      el.style.top = Math.max(0, origY + dy) + 'px';
-    };
-  }
-  function makeResizable(el){
-    const resizer = el.querySelector('.resizer');
-    if(!resizer) return;
-    let isResizing = false, startX=0, startY=0, startW=0, startH=0;
-    resizer.onmousedown = e => {
-      isResizing = true;
-      startX = e.clientX; startY = e.clientY;
-      const rect = el.getBoundingClientRect();
-      startW = rect.width; startH = rect.height;
-      e.preventDefault();
-    };
-    document.onmouseup = () => { isResizing = false; };
-    document.onmousemove = e => {
-      if(!isResizing) return;
-      const dx = e.clientX - startX;
-      const dy = e.clientY - startY;
-      el.style.width = Math.max(200, startW + dx) + 'px';
-      el.style.height = Math.max(100, startH + dy) + 'px';
-    };
-  }
-  function downloadJSON(data, filename){
-    const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = filename || 'data.json';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }
-  function readFileJSON(file){
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = e => {
-        try {
-          const data = JSON.parse(e.target.result);
-          resolve(data);
-        } catch(err) {
-          reject(err);
-        }
-      };
-      reader.onerror = err => reject(err);
-      reader.readAsText(file);
-    });
-  }
-  function slug(text){
-    return text.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
-  }
-  function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  }
-
-  function flash(msg){
-    const f = document.createElement('div');
-    f.textContent = msg;
-    f.style.position = 'fixed';
-    f.style.bottom = '20px';
-    f.style.left = '50%';
-    f.style.transform = 'translateX(-50%)';
-    f.style.background = 'rgba(0,0,0,.7)';
-    f.style.color = '#fff';
-    f.style.padding = '10px 20px';
-    f.style.borderRadius = '20px';
-    f.style.zIndex = '100';
-    f.style.opacity = '0';
-    f.style.transition = 'opacity .3s ease';
-    document.body.appendChild(f);
-    setTimeout(() => { f.style.opacity = '1'; }, 10);
-    setTimeout(() => {
-      f.style.opacity = '0';
-      setTimeout(() => { document.body.removeChild(f); }, 300);
-    }, 2000);
-  }
+  function slug(s){ return s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,''); }
+  function escapeHtml(s=''){ return s.replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
+  function downloadJSON(obj, name){ const blob = new Blob([JSON.stringify(obj,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); URL.revokeObjectURL(a.href); }
+  function readFileJSON(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>{ try{ res(JSON.parse(r.result)); }catch(e){ rej(e); } }; r.onerror=rej; r.readAsText(file); }); }
+  function flash(msg){ const n=document.createElement('div'); n.textContent=msg; Object.assign(n.style,{position:'fixed',inset:'auto auto 20px 50%',transform:'translateX(-50%)',background:'#0f182b',border:'1px solid #2a3557',padding:'10px 14px',borderRadius:'12px',zIndex:99,boxShadow:'0 10px 30px rgba(0,0,0,.4)'}); document.body.appendChild(n); setTimeout(()=>n.remove(),1600); }
 })();
 </script>
 </body>
