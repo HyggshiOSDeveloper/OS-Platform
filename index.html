@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OS Builder Platform</title>
+  <style>
+    :root{
+      --bg:#0b0f18;--panel:#111726;--muted:#1a2236;--text:#e8eefc;--accent:#6aa6ff;--ok:#27c93f;--warn:#ffbd2e;--bad:#ff5f57;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:linear-gradient(180deg,#0a0e16,#0d1629 40%,#0a0e16);color:var(--text);font:14px/1.4 system-ui,Segoe UI,Roboto,Helvetica,Arial}
+    a{color:var(--accent)}
+    button,input,select,textarea{font:inherit;color:inherit}
+    .app{display:grid;grid-template-rows:auto 1fr;min-height:100vh}
+    .topbar{display:flex;gap:.5rem;align-items:center;padding:.6rem .9rem;background:rgba(255,255,255,.03);backdrop-filter:blur(10px);border-bottom:1px solid #1b2540;position:sticky;top:0;z-index:10}
+    .topbar h1{font-size:16px;margin:0 8px 0 0;letter-spacing:.5px;opacity:.9}
+    .spacer{flex:1}
+    .btn{border:1px solid #2a3557;background:linear-gradient(180deg,#1a2236,#141b2c);padding:.45rem .7rem;border-radius:12px;cursor:pointer;transition:.15s;display:inline-flex;gap:.5rem;align-items:center}
+    .btn:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(0,0,0,.25),inset 0 0 0 999px rgba(255,255,255,.02)}
+    .btn.primary{border-color:#2e3f71;background:linear-gradient(180deg,#24407a,#1c3161)}
+    .btn.ghost{background:transparent}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;padding:16px}
+    .card{background:linear-gradient(180deg,#131a2c,#0f1524);border:1px solid #27345a;border-radius:18px;overflow:hidden;box-shadow:0 8px 28px rgba(0,0,0,.25)}
+    .card .thumb{height:120px;background:#0e1422 center/cover no-repeat}
+    .card .body{padding:12px}
+    .row{display:flex;gap:8px;align-items:center}
+    .tag{padding:.2rem .5rem;border:1px solid #2a3557;border-radius:999px;font-size:12px;opacity:.9}
+    .small{font-size:12px;opacity:.8}
+
+    /* Drawer */
+    .drawer{position:fixed;inset:0 0 0 auto;width:420px;max-width:100vw;transform:translateX(105%);transition:transform .25s ease;z-index:30;background:linear-gradient(180deg,#0f1629,#0e1322);border-left:1px solid #24325a;box-shadow: -20px 0 60px rgba(0,0,0,.45)}
+    .drawer.open{transform:none}
+    .drawer header{display:flex;align-items:center;gap:.5rem;padding:14px;border-bottom:1px solid #24325a}
+    .drawer .content{padding:14px;display:grid;gap:12px;overflow:auto;max-height:calc(100vh - 52px)}
+    .field{display:grid;gap:6px}
+    .field input,.field select,.field textarea{background:#0e1424;border:1px solid #27345a;border-radius:12px;padding:.5rem .7rem}
+    .chips{display:flex;gap:6px;flex-wrap:wrap}
+    .chip{border:1px solid #2a3557;border-radius:999px;padding:.25rem .55rem;cursor:pointer}
+    .chip.active{background:#20325f}
+
+    /* Desktop/Sandbox */
+    .sandbox{display:grid;grid-template-columns: 360px 1fr;gap:14px;padding:14px}
+    .leftcol{background:linear-gradient(180deg,#121a2c,#0d1424);border:1px solid #26345e;border-radius:18px;overflow:hidden}
+    .leftcol header{padding:12px 14px;border-bottom:1px solid #26345e}
+    .leftcol .list{padding:10px;display:grid;gap:8px;max-height:calc(100vh - 220px);overflow:auto}
+    .tile{display:flex;gap:10px;align-items:center;background:#0f1729;border:1px solid #233158;border-radius:14px;padding:10px}
+    .tile .icon{font-size:22px}
+    .rightcol{position:relative;border-radius:18px;overflow:hidden;border:1px solid #26345e}
+    .desktop{position:relative;min-height:520px;background-size:cover;background-position:center}
+    .taskbar{position:absolute;inset:auto 0 0 0;display:flex;align-items:center;gap:6px;padding:6px;background:rgba(10,13,22,.6);backdrop-filter: blur(8px);border-top:1px solid #26345e}
+    .taskbar .task{padding:.35rem .6rem;border:1px solid #2a3557;border-radius:10px;cursor:pointer;background:#0f1527}
+
+    /* Windows */
+    .window{position:absolute;top:60px;left:60px;width:420px;min-width:260px;min-height:160px;background:#0d1424;border:1px solid #2a3a64;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.45);display:flex;flex-direction:column;overflow:hidden}
+    .titlebar{display:flex;align-items:center;gap:8px;padding:8px;border-bottom:1px solid #24325a;background:linear-gradient(180deg,#10182b,#0c1221);cursor:grab}
+    .titlebar .dot{width:12px;height:12px;border-radius:50%}
+    .titlebar .dot.close{background:var(--bad)}
+    .titlebar .dot.min{background:var(--warn)}
+    .titlebar .dot.max{background:var(--ok)}
+    .content{flex:1;overflow:auto;background:#0c1220}
+    .resizer{position:absolute;inset:auto 0 0 auto;width:16px;height:16px;cursor:nwse-resize}
+
+    .empty{padding:18px;text-align:center;opacity:.8}
+
+    @media (max-width: 980px){
+      .sandbox{grid-template-columns:1fr}
+      .leftcol{order:2}
+      .rightcol{order:1}
+      .desktop{min-height:480px}
+    }
+  </style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="topbar">
+    <h1>OS Builder Platform</h1>
+    <button class="btn" id="newBtn">➕ Create OS</button>
+    <button class="btn" id="importBtn">⬆️ Import .os.json</button>
+    <button class="btn ghost" id="helpBtn">❓ Help</button>
+    <div class="spacer"></div>
+    <button class="btn" id="saveGalleryBtn">💾 Save Platform</button>
+    <button class="btn primary" id="resetBtn">🗑 Reset</button>
+  </div>
+
+  <div class="sandbox">
+    <!-- Gallery / Platform -->
+    <section class="leftcol">
+      <header class="row">
+        <strong style="padding-right:6px">Platform Gallery</strong>
+        <span class="small" id="countLabel"></span>
+        <div class="spacer"></div>
+        <button class="btn" id="exportPlatformBtn" title="Export a .platform.json file">⤓ Export</button>
+      </header>
+      <div class="list" id="gallery"></div>
+    </section>
+
+    <!-- Live Preview Desktop -->
+    <section class="rightcol">
+      <div id="desktop" class="desktop" style="background-image:url('https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1600&auto=format&fit=crop');">
+        <div class="taskbar" id="taskbar"></div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- Drawer: OS Builder -->
+<aside class="drawer" id="drawer">
+  <header>
+    <button class="btn ghost" id="closeDrawer">←</button>
+    <strong>New / Edit Operating System</strong>
+    <div class="spacer"></div>
+    <button class="btn" id="saveOsBtn">✅ Save OS</button>
+  </header>
+  <div class="content">
+    <div class="field">
+      <label>OS Name</label>
+      <input id="osName" placeholder="e.g., NebulaOS"/>
+    </div>
+    <div class="field">
+      <label>Wallpaper URL</label>
+      <input id="osWallpaper" placeholder="Paste image URL"/>
+    </div>
+    <div class="field">
+      <label>Theme Accent</label>
+      <input id="osAccent" type="color" value="#6aa6ff"/>
+    </div>
+    <div class="field">
+      <label>Dock / Taskbar Position</label>
+      <select id="osDockPos">
+        <option value="bottom">Bottom</option>
+        <option value="top">Top</option>
+        <option value="left">Left</option>
+        <option value="right">Right</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Default Apps (toggle)</label>
+      <div class="chips" id="appsToggle"></div>
+    </div>
+    <div class="field">
+      <label>Custom App (quick add)</label>
+      <input id="customAppName" placeholder="App name"/>
+      <textarea id="customAppHtml" rows="4" placeholder="HTML content of the app window"></textarea>
+      <button class="btn" id="addCustomAppBtn">Add Custom App</button>
+    </div>
+    <div class="field">
+      <label>Export / Import</label>
+      <div class="row">
+        <button class="btn" id="exportOsBtn">⤓ Export .os.json</button>
+        <input type="file" id="importOsFile" accept="application/json"/>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<input type="file" id="platformFile" accept="application/json" hidden />
+
+<script>
+(() => {
+  const $ = (sel, root=document) => root.querySelector(sel);
+  const $$ = (sel, root=document) => [...root.querySelectorAll(sel)];
+  const uid = () => Math.random().toString(36).slice(2,9);
+
+    const DEFAULT_APPS = [
+    {
+      id: 'notes', title: 'Notes', icon: '📝',
+      html: `<div style="padding:10px;display:grid;gap:8px">
+        <textarea style="width:100%;height:220px;background:#0a1120;color:#dfe7fb;
+        border:1px solid #2a3557;border-radius:8px"></textarea></div>`
+    },
+    {
+      id: 'paint', title: 'Paint', icon: '🎨',
+      html: `<div style="padding:10px"><canvas id="paintCanvas" width="560" height="280" 
+        style="background:#0a1120;border:1px solid #2a3557;border-radius:8px"></canvas>
+        <script>
+          const c=document.getElementById('paintCanvas');
+          if(c){
+            const ctx=c.getContext('2d');let d=false;let x=0,y=0;
+            c.onmousedown=e=>{d=true;x=e.offsetX;y=e.offsetY};
+            c.onmouseup=()=>d=false;
+            c.onmousemove=e=>{
+              if(!d)return;
+              ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(e.offsetX,e.offsetY);
+              ctx.strokeStyle='#6aa6ff';ctx.lineWidth=2;ctx.stroke();
+              x=e.offsetX;y=e.offsetY;
+            };
+          }
+        <\/script></div>`
+    },
+    {
+      id: 'browser', title: 'Web', icon: '🌐',
+      html: `<div style="display:grid;gap:8px;padding:8px">
+        <input placeholder="Enter URL" style="background:#0a1120;color:#dfe7fb;
+        border:1px solid #2a3557;border-radius:8px;padding:.4rem"
+        onkeydown="if(event.key==='Enter'){
+          const f=this.value.startsWith('http')?this.value:'https://'+this.value;
+          this.nextElementSibling.src=f}"/>
+        <iframe style="min-height:260px;border:1px solid #2a3557;border-radius:8px" 
+          src="https://example.com"></iframe></div>`
+    },
+    {
+      id: 'music', title: 'Music', icon: '🎵',
+      html: `<div style="padding:10px"><audio controls style="width:100%">
+        <source src="" type="audio/mpeg"/></audio>
+        <p class="small" style="opacity:.8;padding-top:6px">
+          Use Settings to set a track URL.</p></div>`
+    },
+    {
+      id: 'terminal', title: 'Terminal', icon: '⌨️',
+      html: `<div style="padding:10px;font-family:ui-monospace,Consolas,monospace">
+        <pre id="term" style="background:#060a14;color:#a7ffb9;padding:10px;
+        border-radius:8px;min-height:220px">Nebula Shell v0.1\nType 'help' to start.</pre>
+        <input id="cmd" placeholder=">" style="width:100%;background:#0a1120;
+        color:#dfe7fb;border:1px solid #2a3557;border-radius:8px;padding:.4rem"/>
+        <script>
+          (()=>{const out=document.getElementById('term');
+            const cmd=document.getElementById('cmd');
+            if(!out||!cmd)return;
+            const help="help, echo, time";
+            cmd.onkeydown=e=>{
+              if(e.key==='Enter'){
+                const v=cmd.value.trim();
+                if(!v)return;
+                out.textContent+="\\n> "+v;
+                if(v==='help') out.textContent+="\\n"+help;
+                else if(v.startsWith('echo ')) out.textContent+="\\n"+v.slice(5);
+                else if(v==='time') out.textContent+="\\n"+(new Date()).toLocaleString();
+                else out.textContent+="\\nUnknown command";
+                cmd.value=''; out.scrollTop=out.scrollHeight;
+              }
+            }
+          })()
+        <\/script></div>`
+    },
+    {
+      id: 'settings', title: 'Settings', icon: '⚙️',
+      html: `<div style="padding:10px;display:grid;gap:8px">
+        <label>Accent <input type="color" id="setAccent"/></label>
+        <label>Wallpaper URL <input id="setWall"/></label>
+        <button onclick="(function(){
+          const a=document.getElementById('setAccent').value;
+          const w=document.getElementById('setWall').value;
+          window.__applySettings && window.__applySettings({accent:a,wallpaper:w});
+        })()" class="btn">Apply</button></div>`
+    }
+  ];
+
+
+  // --- State ---
+  let gallery = loadPlatform(); // array of OS objects
+  let activeOS = null; // preview
+  let editingId = null;
+
+  // --- Elements ---
+  const galleryEl = $('#gallery');
+  const countLabel = $('#countLabel');
+  const newBtn = $('#newBtn');
+  const importBtn = $('#importBtn');
+  const helpBtn = $('#helpBtn');
+  const saveGalleryBtn = $('#saveGalleryBtn');
+  const exportPlatformBtn = $('#exportPlatformBtn');
+  const resetBtn = $('#resetBtn');
+  const drawer = $('#drawer');
+  const closeDrawer = $('#closeDrawer');
+  const saveOsBtn = $('#saveOsBtn');
+  const osName = $('#osName');
+  const osWallpaper = $('#osWallpaper');
+  const osAccent = $('#osAccent');
+  const osDockPos = $('#osDockPos');
+  const appsToggle = $('#appsToggle');
+  const addCustomAppBtn = $('#addCustomAppBtn');
+  const customAppName = $('#customAppName');
+  const customAppHtml = $('#customAppHtml');
+  const exportOsBtn = $('#exportOsBtn');
+  const importOsFile = $('#importOsFile');
+  const platformFile = $('#platformFile');
+  const desktop = $('#desktop');
+  const taskbar = $('#taskbar');
+
+  // --- Init ---
+  renderGallery();
+  setPreview(gallery[0]);
+
+  // --- Event wiring ---
+  newBtn.onclick = () => openBuilder();
+  importBtn.onclick = () => platformFile.click();
+  helpBtn.onclick = () => alert(`How it works:\n\n• Create OS: open the builder, set name, wallpaper, accent, choose apps.\n• Save OS: stores to the Platform Gallery (local).\n• Export: download a .os.json to share; Import to add someone else's OS.\n• Click a card to preview and use the OS. Windows are draggable + resizable.\n• Save Platform: saves entire gallery to localStorage. Export to .platform.json to back up.\n\nTip: Add a Custom App by pasting HTML (widgets, iframes, etc.).`);
+  saveGalleryBtn.onclick = () => { savePlatform(gallery); flash('Platform saved to this browser.'); };
+  exportPlatformBtn.onclick = () => downloadJSON({ type:'platform', items: gallery }, `platform-${Date.now()}.platform.json`);
+  resetBtn.onclick = () => { if(confirm('Reset platform and clear localStorage?')){ gallery = []; savePlatform(gallery); renderGallery(); clearDesktop(); }}
+
+  closeDrawer.onclick = () => drawer.classList.remove('open');
+  saveOsBtn.onclick = persistOS;
+  exportOsBtn.onclick = () => {
+    const os = gatherFromForm();
+    if(!os.name) return alert('Name your OS first.');
+    downloadJSON(os, `${slug(os.name)}.os.json`);
+  }
+  importOsFile.onchange = e => {
+    const f = e.target.files[0]; if(!f) return;
+    readFileJSON(f).then(os => { addOrReplaceOS(os); drawer.classList.remove('open'); });
+  }
+  platformFile.onchange = e => {
+    const f = e.target.files[0]; if(!f) return;
+    readFileJSON(f).then(pl => { if(pl && Array.isArray(pl.items)) { gallery = pl.items; savePlatform(gallery); renderGallery(); } else { alert('Invalid platform file'); } });
+  }
+  addCustomAppBtn.onclick = () => {
+    const name = customAppName.value.trim();
+    const html = customAppHtml.value.trim();
+    if(!name || !html) return alert('Enter name and HTML.');
+    const chip = createChip({ id: uid(), title: name, icon: '🧩', html }, true);
+    appsToggle.prepend(chip);
+    customAppName.value=''; customAppHtml.value='';
+  }
+
+  // --- Platform functions ---
+  function loadPlatform(){
+    try{ return JSON.parse(localStorage.getItem('osPlatform')||'[]'); }catch(e){ return []; }
+  }
+  function savePlatform(items){ localStorage.setItem('osPlatform', JSON.stringify(items)); }
+  function renderGallery(){
+    galleryEl.innerHTML = '';
+    countLabel.textContent = `${gallery.length} OS${gallery.length!==1?'es':''}`;
+    if(!gallery.length){ galleryEl.innerHTML = `<div class="empty">No OS yet. Click <b>Create OS</b> to start, or <b>Import</b> an .os.json.</div>`; return; }
+    gallery.forEach(os => {
+      const card = document.createElement('div'); card.className='card';
+      card.innerHTML = `
+        <div class="thumb" style="background-image:url('${os.wallpaper||''}')"></div>
+        <div class="body">
+          <div class="row"><strong>${escapeHtml(os.name)}</strong><span class="spacer"></span><span class="tag">${os.apps?.length||0} apps</span></div>
+          <div class="row" style="margin-top:8px">
+            <button class="btn" data-act="open">▶️ Open</button>
+            <button class="btn" data-act="edit">✏️ Edit</button>
+            <button class="btn" data-act="export">⤓</button>
+            <button class="btn" data-act="delete">🗑</button>
+          </div>
+        </div>`;
+      card.querySelector('[data-act="open"]').onclick = () => setPreview(os);
+      card.querySelector('[data-act="edit"]').onclick = () => openBuilder(os.id);
+      card.querySelector('[data-act="export"]').onclick = () => downloadJSON(os, `${slug(os.name)}.os.json`);
+      card.querySelector('[data-act="delete"]').onclick = () => { if(confirm('Delete this OS?')){ gallery = gallery.filter(x=>x.id!==os.id); savePlatform(gallery); renderGallery(); if(activeOS?.id===os.id) clearDesktop(); } };
+      galleryEl.appendChild(card);
+    });
+  }
+  function addOrReplaceOS(os){
+    if(!os.id) os.id = uid();
+    const i = gallery.findIndex(x=>x.id===os.id);
+    if(i>=0) gallery[i]=os; else gallery.unshift(os);
+    savePlatform(gallery); renderGallery(); setPreview(os);
+  }
+
+  // --- Builder ---
+  function openBuilder(id){
+    editingId = id||null; drawer.classList.add('open');
+    appsToggle.innerHTML = '';
+    DEFAULT_APPS.forEach(app => appsToggle.appendChild(createChip(app)));
+
+    if(id){
+      const os = gallery.find(x=>x.id===id); if(!os) return;
+      osName.value = os.name||''; osWallpaper.value = os.wallpaper||''; osAccent.value = os.accent||'#6aa6ff'; osDockPos.value = os.dockPos||'bottom';
+      // mark enabled apps
+      (os.apps||[]).forEach(a=>{
+        const chip = [...appsToggle.children].find(c=>c.dataset.id===a.id);
+        if(chip){ chip.classList.add('active'); chip.dataset.enabled='1'; chip.dataset.icon=a.icon||'🧩'; chip.dataset.title=a.title; chip.dataset.html=a.html }
+      })
+    } else {
+      osName.value=''; osWallpaper.value=''; osAccent.value='#6aa6ff'; osDockPos.value='bottom';
+    }
+  }
+  function persistOS(){
+    const os = gatherFromForm();
+    if(!os.name) return alert('Please name your OS.');
+    addOrReplaceOS(os); drawer.classList.remove('open');
+  }
+  function gatherFromForm(){
+    const apps = [...appsToggle.children].filter(c=>c.dataset.enabled==='1').map(c=>({ id:c.dataset.id, title:c.dataset.title, icon:c.dataset.icon, html:c.dataset.html }));
+    return {
+      id: editingId || uid(),
+      name: osName.value.trim(),
+      wallpaper: osWallpaper.value.trim(),
+      accent: osAccent.value,
+      dockPos: osDockPos.value,
+      apps
+    }
+  }
+  function createChip(app, active=false){
+    const chip = document.createElement('div');
+    chip.className = 'chip' + (active?' active':'');
+    chip.textContent = `${app.icon||'🧩'} ${app.title}`;
+    chip.dataset.id=app.id; chip.dataset.title=app.title; chip.dataset.icon=app.icon||'🧩'; chip.dataset.html=app.html||'<div style="padding:10px">Empty app</div>';
+    chip.dataset.enabled = active? '1':'0';
+    chip.onclick = () => { const en = chip.dataset.enabled==='1'; chip.dataset.enabled = en?'0':'1'; chip.classList.toggle('active'); };
+    return chip;
+  }
+
+  // --- Preview Desktop ---
+  function setPreview(os){
+    activeOS = os||null; clearDesktop();
+    if(!os) return;
+    // wallpaper
+    desktop.style.backgroundImage = os.wallpaper? `url('${os.wallpaper}')` : desktop.style.backgroundImage;
+    desktop.style.setProperty('--accent', os.accent||'#6aa6ff');
+    positionTaskbar(os.dockPos||'bottom');
+    // apps -> icons on taskbar & openable windows
+    taskbar.innerHTML = '';
+    (os.apps||[]).forEach((app,i)=>{
+      const btn = document.createElement('button');
+      btn.className='task'; btn.textContent = `${app.icon||'🧩'} ${app.title}`;
+      btn.onclick = () => openWindow(app);
+      taskbar.appendChild(btn);
+      if(i<2) openWindow(app); // auto-open first 2
+    })
+    // settings bridge
+    window.__applySettings = ({accent, wallpaper})=>{
+      if(accent){ desktop.style.setProperty('--accent', accent); activeOS.accent = accent; }
+      if(wallpaper){ desktop.style.backgroundImage = `url('${wallpaper}')`; activeOS.wallpaper = wallpaper; }
+      // update card preview silently
+      const i = gallery.findIndex(x=>x.id===activeOS.id); if(i>=0) { gallery[i]=activeOS; savePlatform(gallery); renderGallery(); }
+    }
+  }
+  function positionTaskbar(pos){
+    const tb = taskbar; tb.style.inset='';
+    if(pos==='bottom'){ tb.style.inset = 'auto 0 0 0'; tb.style.flexDirection='row'; }
+    if(pos==='top'){ tb.style.inset = '0 0 auto 0'; tb.style.flexDirection='row'; }
+    if(pos==='left'){ tb.style.inset = '0 auto 0 0'; tb.style.flexDirection='column'; }
+    if(pos==='right'){ tb.style.inset = '0 0 0 auto'; tb.style.flexDirection='column'; }
+  }
+  function clearDesktop(){ desktop.querySelectorAll('.window').forEach(w=>w.remove()); taskbar.innerHTML=''; }
+
+  function openWindow(app){
+    const win = document.createElement('div'); win.className='window'; win.style.left = 60 + Math.random()*120 + 'px'; win.style.top = 60 + Math.random()*80 + 'px';
+    win.innerHTML = `
+      <div class="titlebar">
+        <span class="dot close" title="Close"></span>
+        <span class="dot min" title="Minimize"></span>
+        <span class="dot max" title="Maximize"></span>
+        <strong style="margin-left:6px">${escapeHtml(app.title)}</strong>
+      </div>
+      <div class="content">${app.html||''}</div>
+      <div class="resizer"></div>`;
+    desktop.appendChild(win);
+    makeDraggable(win); makeResizable(win);
+    // controls
+    const [close,min,max] = $$('.titlebar .dot', win);
+    close.onclick = () => win.remove();
+    min.onclick = () => win.querySelector('.content').style.display = (win.querySelector('.content').style.display==='none'?'block':'none');
+    max.onclick = () => { if(win.dataset.max==='1'){ win.style.left='60px'; win.style.top='60px'; win.style.width='420px'; win.style.height=''; win.dataset.max='0'; } else { win.style.left='0'; win.style.top='0'; win.style.width='100%'; win.style.height='100%'; win.dataset.max='1'; }}
+  }
+
+  // --- Window helpers ---
+  function makeDraggable(win){
+    const bar = $('.titlebar', win);
+    let ox=0, oy=0, sx=0, sy=0, drag=false;
+    bar.addEventListener('mousedown', e=>{ drag=true; bar.style.cursor='grabbing'; sx=e.clientX; sy=e.clientY; const r=win.getBoundingClientRect(); ox=r.left; oy=r.top; });
+    window.addEventListener('mousemove', e=>{ if(!drag) return; const nx = ox + (e.clientX - sx); const ny = oy + (e.clientY - sy); win.style.left=nx+'px'; win.style.top=ny+'px'; });
+    window.addEventListener('mouseup', ()=>{ drag=false; bar.style.cursor='grab'; });
+  }
+  function makeResizable(win){
+    const rz = $('.resizer', win); let sx=0, sy=0, sw=0, sh=0, rs=false;
+    rz.addEventListener('mousedown', e=>{ rs=true; sx=e.clientX; sy=e.clientY; const r=win.getBoundingClientRect(); sw=r.width; sh=r.height; e.preventDefault(); });
+    window.addEventListener('mousemove', e=>{ if(!rs) return; win.style.width = (sw + (e.clientX - sx)) + 'px'; win.style.height = (sh + (e.clientY - sy)) + 'px'; });
+    window.addEventListener('mouseup', ()=> rs=false);
+  }
+
+  // --- Utils ---
+  function slug(s){ return s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,''); }
+  function escapeHtml(s=''){ return s.replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
+  function downloadJSON(obj, name){ const blob = new Blob([JSON.stringify(obj,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); URL.revokeObjectURL(a.href); }
+  function readFileJSON(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>{ try{ res(JSON.parse(r.result)); }catch(e){ rej(e); } }; r.onerror=rej; r.readAsText(file); }); }
+  function flash(msg){ const n=document.createElement('div'); n.textContent=msg; Object.assign(n.style,{position:'fixed',inset:'auto auto 20px 50%',transform:'translateX(-50%)',background:'#0f182b',border:'1px solid #2a3557',padding:'10px 14px',borderRadius:'12px',zIndex:99,boxShadow:'0 10px 30px rgba(0,0,0,.4)'}); document.body.appendChild(n); setTimeout(()=>n.remove(),1600); }
+})();
+</script>
+</body>
+</html>
